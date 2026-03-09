@@ -2,7 +2,6 @@ using System.Text;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
-using Scalar.AspNetCore;
 using Serilog;
 using SecureApiFoundation.Api.Extensions;
 using SecureApiFoundation.Api.Middleware;
@@ -68,28 +67,42 @@ builder.Services.AddRateLimiter(options =>
     };
 });
 
-// OpenAPI / Scalar / Swagger
-builder.Services.AddOpenApi(options =>
+// Swagger
+builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddSwaggerGen(options =>
 {
-    options.AddDocumentTransformer((document, context, cancellationToken) =>
+    options.SwaggerDoc("v1", new Microsoft.OpenApi.Models.OpenApiInfo
     {
-        document.Info = new()
-        {
-            Title = "Secure API Foundation",
-            Version = "v1",
-            Description = "A production-ready ASP.NET Core Web API with JWT authentication, refresh token rotation, and device session management."
-        };
-        return Task.CompletedTask;
+        Title = "Secure API Foundation",
+        Version = "v1",
+        Description = "A production-ready ASP.NET Core Web API with JWT authentication, refresh token rotation, and device session management."
     });
 
-    // Add security scheme for JWT Bearer tokens
-    options.AddSchemaTransformer((schema, context, cancellationToken) =>
+    options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
     {
-        return Task.CompletedTask;
+        Description = "Enter JWT token",
+        Name = "Authorization",
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.Http,
+        Scheme = "bearer",
+        BearerFormat = "JWT"
+    });
+
+    options.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "Bearer"
+                }
+            },
+            Array.Empty<string>()
+        }
     });
 });
-
-builder.Services.AddEndpointsApiExplorer();
 
 // CORS
 builder.Services.AddCors(options =>
@@ -118,21 +131,10 @@ app.UseSerilogRequestLogging();
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference(options =>
-    {
-        options.Title = "Secure API Foundation";
-        options.Theme = ScalarTheme.Purple;
-        options.AddHttpAuthentication("Bearer", bearer =>
-        {
-            bearer.Token = "your-jwt-token";
-        });
-    });
-
-    // Swagger UI using the built-in OpenAPI document
+    app.UseSwagger();
     app.UseSwaggerUI(options =>
     {
-        options.SwaggerEndpoint("/openapi/v1.json", "Secure API Foundation v1");
+        options.SwaggerEndpoint("/swagger/v1/swagger.json", "Secure API Foundation v1");
         options.RoutePrefix = "swagger";
         options.DocumentTitle = "Secure API Foundation - Swagger UI";
         options.DisplayRequestDuration();
